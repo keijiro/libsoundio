@@ -520,7 +520,7 @@ static int detect_valid_layouts(struct RefreshDevices *rd, WAVEFORMATEXTENSIBLE 
     WAVEFORMATEX *closest_match = NULL;
     WAVEFORMATEXTENSIBLE orig_wave_format = *wave_format;
 
-    for (int i = 0; i < ARRAY_LENGTH(test_formats); i += 1) {
+    for (int i = 0; i < ARRAY_LENGTH(test_layouts); i += 1) {
         enum SoundIoChannelLayoutId test_layout_id = test_layouts[i];
         const struct SoundIoChannelLayout *test_layout = soundio_channel_layout_get_builtin(test_layout_id);
         to_wave_format_layout(test_layout, wave_format);
