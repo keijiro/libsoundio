@@ -160,6 +160,19 @@ static enum SoundIoChannelLayoutId test_layouts[] = {
     SoundIoChannelLayoutId5Point1Back,
 };
 
+// keijiro: This table is used to determine the default layout when no layout
+// information was given from WASAPI.
+static enum SoundIoChannelLayoutId default_layouts[] = {
+    SoundIoChannelLayoutIdMono,
+    SoundIoChannelLayoutIdStereo,
+    SoundIoChannelLayoutId3Point0,
+    SoundIoChannelLayoutIdQuad,
+    SoundIoChannelLayoutId5Point0Back,
+    SoundIoChannelLayoutIdHexagonal,
+    SoundIoChannelLayoutId7Point0,
+    SoundIoChannelLayoutIdOctagonal,
+};
+
 /*
 // useful for debugging but no point in compiling into binary
 static const char *hresult_to_str(HRESULT hr) {
@@ -296,8 +309,16 @@ static void from_channel_mask_layout(UINT channel_mask, struct SoundIoChannelLay
 
 static void from_wave_format_layout(WAVEFORMATEXTENSIBLE *wave_format, struct SoundIoChannelLayout *layout) {
     assert(wave_format->Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE);
-    layout->channel_count = 0;
-    from_channel_mask_layout(wave_format->dwChannelMask, layout);
+    if (wave_format->dwChannelMask != 0)
+    {
+        layout->channel_count = 0;
+        from_channel_mask_layout(wave_format->dwChannelMask, layout);
+    }
+    else
+    {
+        // keijiro: Set default layouts when no channel mask was given.
+        *layout = *soundio_channel_layout_get_builtin(default_layouts[wave_format->Format.nChannels - 1]);
+    }
 }
 
 static enum SoundIoFormat from_wave_format_format(WAVEFORMATEXTENSIBLE *wave_format) {
@@ -539,6 +560,32 @@ static int detect_valid_layouts(struct RefreshDevices *rd, WAVEFORMATEXTENSIBLE 
         } else {
             *wave_format = orig_wave_format;
             return SoundIoErrorOpeningDevice;
+        }
+    }
+
+    // keijiro: If no layout was found, do layout search again but without channel mask information.
+    if (device->layout_count == 0) {
+        for (int i = 0; i < ARRAY_LENGTH(default_layouts); i += 1) {
+            enum SoundIoChannelLayoutId test_layout_id = default_layouts[i];
+            const struct SoundIoChannelLayout *test_layout = soundio_channel_layout_get_builtin(test_layout_id);
+            wave_format->dwChannelMask = 0;
+            wave_format->Format.nChannels = i + 1;
+            complete_wave_format_data(wave_format);
+
+            hr = IAudioClient_IsFormatSupported(rd->audio_client, share_mode,
+                    (WAVEFORMATEX*)wave_format, &closest_match);
+            if (closest_match) {
+                CoTaskMemFree(closest_match);
+                closest_match = NULL;
+            }
+            if (hr == S_OK) {
+                device->layouts[device->layout_count++] = *test_layout;
+            } else if (hr == AUDCLNT_E_UNSUPPORTED_FORMAT || hr == S_FALSE || hr == E_INVALIDARG) {
+                continue;
+            } else {
+                *wave_format = orig_wave_format;
+                return SoundIoErrorOpeningDevice;
+            }
         }
     }
 
