@@ -1204,4 +1204,11 @@ SOUNDIO_EXPORT int soundio_ring_buffer_free_count(struct SoundIoRingBuffer *ring
 /// Must be called by the writer.
 SOUNDIO_EXPORT void soundio_ring_buffer_clear(struct SoundIoRingBuffer *ring_buffer);
 
+struct SoundIoThreadFactory {
+    void* (*create_thread)(void* userdata);
+    void (*destroy_thread)(void* thread);
+};
+
+SOUNDIO_EXPORT void soundio_set_thread_factory(struct SoundIoThreadFactory *factory);
+
 #endif

@@ -89,6 +89,7 @@ struct SoundIoOsThread {
     pthread_t id;
     bool running;
 #endif
+    void *factory_handle;
     void *arg;
     void (*run)(void *arg);
 };
@@ -137,6 +138,8 @@ static clock_serv_t cclock;
 #endif
 #endif
 
+static struct SoundIoThreadFactory *thread_factory = NULL;
+
 static int page_size;
 
 double soundio_os_get_time(void) {
@@ -184,6 +187,10 @@ static void *run_pthread(void *userdata) {
 }
 #endif
 
+void soundio_set_thread_factory(struct SoundIoThreadFactory *factory) {
+    thread_factory = factory;
+}
+
 int soundio_os_thread_create(
         void (*run)(void *arg), void *arg,
         void (*emit_rtprio_warning)(void),
@@ -199,6 +206,17 @@ int soundio_os_thread_create(
 
     thread->run = run;
     thread->arg = arg;
+
+    if (thread_factory != NULL)
+    {
+        thread->factory_handle = (thread_factory->create_thread)(thread);
+        if (!thread->factory_handle) {
+            (thread_factory->destroy_thread)(thread);
+            return SoundIoErrorSystemResources;
+        }
+        *out_thread = thread;
+        return 0;
+    }
 
 #if defined(SOUNDIO_OS_WINDOWS)
     thread->handle = CreateThread(NULL, 0, run_win32_thread, thread, 0, &thread->id);
@@ -261,6 +279,13 @@ void soundio_os_thread_destroy(struct SoundIoOsThread *thread) {
     if (!thread)
         return;
 
+    if (thread_factory != NULL)
+    {
+        if (thread->factory_handle)
+            (thread_factory->destroy_thread)(thread);
+        free(thread);
+        return;
+    }
 #if defined(SOUNDIO_OS_WINDOWS)
     if (thread->handle) {
         DWORD err = WaitForSingleObject(thread->handle, INFINITE);
