@@ -1210,5 +1210,6 @@ struct SoundIoThreadFactory {
 };
 
 SOUNDIO_EXPORT void soundio_set_thread_factory(struct SoundIoThreadFactory *factory);
+SOUNDIO_EXPORT void soundio_run_thread(void *userdata);
 
 #endif

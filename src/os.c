@@ -191,6 +191,11 @@ void soundio_set_thread_factory(struct SoundIoThreadFactory *factory) {
     thread_factory = factory;
 }
 
+void soundio_run_thread(void *userdata) {
+    struct SoundIoOsThread *thread = (struct SoundIoOsThread *)userdata;
+    thread->run(thread->arg);
+}
+
 int soundio_os_thread_create(
         void (*run)(void *arg), void *arg,
         void (*emit_rtprio_warning)(void),
@@ -207,8 +212,7 @@ int soundio_os_thread_create(
     thread->run = run;
     thread->arg = arg;
 
-    if (thread_factory != NULL)
-    {
+    if (thread_factory) {
         thread->factory_handle = (thread_factory->create_thread)(thread);
         if (!thread->factory_handle) {
             (thread_factory->destroy_thread)(thread);
@@ -279,10 +283,9 @@ void soundio_os_thread_destroy(struct SoundIoOsThread *thread) {
     if (!thread)
         return;
 
-    if (thread_factory != NULL)
-    {
+    if (thread_factory) {
         if (thread->factory_handle)
-            (thread_factory->destroy_thread)(thread);
+            (thread_factory->destroy_thread)(thread->factory_handle);
         free(thread);
         return;
     }
