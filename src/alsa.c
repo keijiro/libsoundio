@@ -1078,6 +1078,7 @@ static int instream_wait_for_poll(struct SoundIoInStreamPrivate *is) {
     unsigned short revents;
     for (;;) {
         if ((err = poll(isa->poll_fds, isa->poll_fd_count, -1)) < 0) {
+            if (errno == EINTR) continue;
             return err;
         }
         if ((err = snd_pcm_poll_descriptors_revents(isa->handle,
